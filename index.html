@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Restaurants Open During Corona</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta name="description" content="connecting artists and technologists" />
+    <meta
+      property="og:description"
+      content="connecting artists and technologists"
+    />
+    <meta property="og:title" content="the grid" />
+    <meta
+      name="og:image"
+      content="https://cdn.glitch.com/2d9dc0ec-eb82-4a05-95d0-0af9c980e4f7%2Fgridcap.PNG?v=1575488898709"
+    />
+    <meta property="og:image:width" content="150" />
+    <meta property="og:image:height" content="330" />
+    <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.52.0/mapbox-gl.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
+    <script src="https://npmcdn.com/csv2geojson@latest/csv2geojson.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@5/turf.min.js"></script>
+    <!-- Promise polyfill script required to use Mapbox GL Geocoder in IE 11 -->
+    <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=UA-130208331-3"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+
+      gtag("config", "UA-130208331-3");
+    </script>
+    <link
+      href="https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.0/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.4.2/mapbox-gl-geocoder.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.4.2/mapbox-gl-geocoder.css"
+      type="text/css"
+    />
+    <!-- Promise polyfill script required to use Mapbox GL Geocoder in IE 11 -->
+    <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+
+  <body>
+    <div id="main">
+      <div id="map"></div>
+      <nav id="filter-group" class="filter-group"></nav>
+      <div id="geocoder" class="geocoder"></div>
+      <div class="map-overlay" id="features">
+        <div id="icon-left"></div>
+      </div>
+      <div id="container-base" class="container-base">
+        <div id="container" class="container">
+          <a href="javascript:void(0)" class="closebtn" onclick="closeNav()"
+            >X</a
+          >
+          <div id="popup-content-mobile" class="popup-content-mobile"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function createMobilePopup(text) {
+        document.getElementById("popup-content-mobile").innerHTML = text;
+        //set its conte t o text
+
+        openNav();
+      }
+
+      function openNav() {
+        document.getElementById("container-base").style.visibility = "visible";
+      }
+
+      function closeNav() {
+        document.getElementById("container-base").style.visibility = "hidden";
+
+        map.setFilter("highlight", ["in", "Name", ""]);
+      }
+    </script>
+    <script>
+      mapboxgl.accessToken =
+        "pk.eyJ1IjoidmJlY2tsZXkiLCJhIjoiY2l2bjVpOXN1MDA1MzJvbjE5Y2xveWhreSJ9.5UtoVF_PlcNGeVX07j2DWg";
+
+      var filterGroup = document.getElementById("filter-group");
+
+      var map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/light-v9",
+        center: [-122.349031, 37.812426],
+        zoom: 10
+      });
+
+      //The popup//
+      var popup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: [0, 0]
+      });
+
+      var popupLongText = "";
+
+      function setPopupContent(content) {
+        //save long text without abbreviating in popupLongText
+        popupLongText = content;
+        // abbreviate here rahter than down below
+        popup.setHTML(content);
+      }
+
+      function expandPopupContent() {
+        popup.setHTML(popupLongText);
+      }
+
+      //this makes it so that anytime a popup is open and then a click is made not on an object the popup closes
+      //also allowing for one popup to close while another opens
+      var popupOpen = false;
+
+      map.on("click", function(e) {
+        if ((popupOpen = true)) {
+          popup.remove();
+          popupOpen = false;
+        }
+      });
+
+      /*    var typeMap = {
+        "Delivery & Takeout": "Delivery & Takeout",
+        Both: "Delivery & Takeout",
+        "Takeout, Delivery": "Delivery & Takeout",
+        Delivery: "Delivery",
+        Takeout: "Takeout"
+      }; */
+
+      var colorMap = {
+        "Delivery & Takeout": "#DAA51B",
+        Delivery: "#52BCA3",
+        Takeout: "#5D69B1", //good
+        Other: "#CC61B0" //gray
+      };
+
+      // orange #E58606, purple #5D69B1,teal #52BCA3,bright green #99C945,pink mauve #CC61B0,dark teal #24796C,gold #DAA51B,mid blue #2F8AC4,dark purp #764E9F, salmon #ED645A,heavy pink #CC3A8E
+
+      map.on("load", function() {
+        $.ajax({
+          type: "GET",
+          url:
+            "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKiBz0c8uoRycjtp-D8yTgFEQy3VnQWBJsZ7V16MQ1l2UYlGrN73pI4p9hB5o0U8Yh7yzyxLI3P5rw/pub?gid=507161305&single=true&output=csv",
+          dataType: "text",
+          success: function(csvData) {
+            makeGeoJSON(csvData);
+          }
+        });
+      });
+
+      ////////////////////////////////////////////////////////////////////
+      // Restaurants ////////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////////////////////
+      function makeGeoJSON(csvData) {
+        csv2geojson.csv2geojson(
+          csvData,
+          {
+            latfield: "Latitude",
+            lonfield: "Longitude",
+            delimiter: ","
+          },
+
+          function(err, restaurants) {
+            map.addSource("restaurants", {
+              type: "geojson",
+              data: restaurants
+            });
+
+            map.addLayer({
+              id: "highlight",
+              type: "circle",
+              //    maxzoom: 10,
+              source: "restaurants",
+              layout: {},
+              paint: {
+                "circle-opacity": 0,
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  5,
+                  5,
+                  30,
+                  12
+                ],
+                "circle-stroke-color": [
+                  "match",
+                  ["get", "Service_Method"],
+                  ["Takeout"],
+                  colorMap["Takeout"],
+                  ["Delivery & Takeout"],
+                  colorMap["Delivery & Takeout"],
+                  ["Delivery"],
+                  colorMap["Delivery"],
+                  ["Other"],
+                  colorMap["Other"],
+                  "#ffffff"
+                ],
+                "circle-stroke-width": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  10,
+                  2,
+                  14,
+                  3
+                ]
+              },
+              filter: ["in", "Name", ""]
+            });
+
+            restaurants.features.forEach(function(feature) {
+              var symbol = feature.properties["Service_Method"];
+              var layerID = symbol;
+
+              console.log("list: ", restaurants);
+
+              if (!map.getLayer(layerID)) {
+                map.addLayer({
+                  id: layerID,
+                  type: "circle",
+                  source: "restaurants",
+                  //  'minzoom': 10,
+                  paint: {
+                    "circle-color": [
+                      "match",
+                      ["get", "Service_Method"],
+                      ["Takeout"],
+                      colorMap["Takeout"],
+                      ["Delivery & Takeout"],
+                      colorMap["Delivery & Takeout"],
+                      ["Delivery"],
+                      colorMap["Delivery"],
+                      ["Other"],
+                      colorMap["Other"],
+                      "#ffffff"
+                    ],
+                    "circle-radius": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      5,
+                      4,
+                      30,
+                      10
+                    ],
+                    "circle-stroke-color": "#fff",
+                    "circle-stroke-opacity": 0.5,
+                    "circle-stroke-width": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      10,
+                      1,
+                      14,
+                      2
+                    ]
+                  },
+                  filter: ["==", ["get", "Service_Method"], symbol]
+                });
+
+                console.log("groups: ", layerID);
+
+                // Add checkbox and label elements for the POI layer//
+                var input = document.createElement("input");
+                input.type = "checkbox";
+                input.id = layerID;
+                input.checked = true;
+                filterGroup.appendChild(input);
+
+                var legend_icon = null;
+                var type = feature.properties["Service_Method"];
+
+                // This assigns urls for the icons in the slider table//
+                legend_icon = colorMap[type];
+
+                var label = document.createElement("label");
+                var image1 = "<img src=" + legend_icon + " class='w3-image'>";
+
+                label.setAttribute("for", layerID);
+                label.innerHTML = feature.properties["Service_Method"];
+                filterGroup.appendChild(label);
+                label.style.backgroundColor = legend_icon;
+
+                // When the checkbox changes, update the visibility of the layer.
+                input.addEventListener("change", function(e) {
+                  map.setLayoutProperty(
+                    layerID,
+                    "visibility",
+                    e.target.checked ? "visible" : "none"
+                  );
+                });
+              }
+
+              map.on("click", layerID, function(e) {
+                var list_items = "";
+
+                var bbox = [[e.point.x, e.point.y], [e.point.x, e.point.y]];
+                var features = map.queryRenderedFeatures(bbox, {
+                  layers: ["Delivery & Takeout", "Delivery", "Takeout", "Other"]
+                });
+
+                var filter = features.reduce(
+                  function(memo, feature) {
+                    memo.push(feature.properties.Name);
+                    return memo;
+                  },
+                  ["in", "Name"]
+                );
+
+                map.setFilter("highlight", filter);
+
+                features.forEach(function(feature) {
+                  var coord = feature.geometry.coordinates;
+                  var name = feature.properties.Name;
+                  var address = feature.properties.Address;
+                  var type = feature.properties["Service Method"];
+                  var location = feature.properties.Location;
+                  if (location != null && location != "") {
+                    location = location;
+                  } else {
+                    location = feature.properties.Region;
+                  }
+                  var cuisine = feature.properties.Cuisine;
+                  var phone = feature.properties.Phone;
+                  var details = feature.properties.Details;
+                  var hours = feature.properties.Hours;
+
+                  var website =
+                    "<a href=" +
+                    '"' +
+                    formatUrl(feature.properties.Website) +
+                    '"' +
+                    ' target="_blank">' +
+                    name +
+                    "</a>";
+
+                  var phone =
+                    "<a href=" +
+                    '"' +
+                    "tel:+1" +
+                    feature.properties.Phone.replace(/[-()\s]/g, "") +
+                    '"' +
+                    ">" +
+                    feature.properties.Phone +
+                    "</a>";
+
+                  // <a href="tel:+1-303-499-7111">+1 (303) 499-7111</a>
+
+                  list_items =
+                    list_items +
+                    "<h3>" +
+                    website +
+                    "<br>" +
+                    cuisine +
+                    "<br>" +
+                    address +
+                    "<br>" +
+                    location +
+                    "<br>" +
+                    phone +
+                    "<br>" +
+                    "—" +
+                    "<br>" +
+                    hours +
+                    "<br>" +
+                    type +
+                    "<br>" +
+                    details +
+                    "</h3>";
+                });
+
+                var contentAsString = "<ul>" + list_items + "</ul>";
+
+                createMobilePopup(contentAsString);
+              });
+            });
+
+            ////////////////////////////////////////////////////////////////////
+            // GEOCODER ////////////////////////////////////////////////////////
+            ////////////////////////////////////////////////////////////////////
+            var geocoder = new MapboxGeocoder({});
+
+            //Here the restaurants are brought in from above//
+            var customData = restaurants;
+
+            //Here the geocoder (search bar) searches by the centroid layer!//
+            function forwardGeocoder(query) {
+              var matchingFeatures = [];
+              for (var i = 0; i < customData.features.length; i++) {
+                var feature = customData.features[i];
+                // handle queries with different capitalization than the source data by calling toLowerCase()
+                if (
+                  feature.properties.Name.toLowerCase().search(
+                    query.toLowerCase()
+                  ) !== -1 ||
+                  feature.properties.Cuisine.toLowerCase().search(
+                    query.toLowerCase()
+                  ) !== -1
+                ) {
+                  feature["id"] = feature.properties.Name;
+                  feature["place_name"] =
+                    "🍴 " +
+                    feature.properties.Name +
+                    " (" +
+                    feature.properties.Cuisine +
+                    ")" +
+                    ", " +
+                    feature.properties.City;
+                  feature["center"] = feature.geometry.coordinates;
+                  feature["place_type"] = feature.properties["Service_Method"];
+                  var list_items = "";
+                  var name = feature.properties.Name;
+                  var address = feature.properties.Address;
+                  var type = feature.properties["Service Method"];
+                  var location = feature.properties.Location;
+                  if (location != null && location != "") {
+                    location = location;
+                  } else {
+                    location = feature.properties.Region;
+                  }
+                  var cuisine = feature.properties.Cuisine;
+                  var phone = feature.properties.Phone;
+                  var details = feature.properties.Details;
+                  var hours = feature.properties.Hours;
+
+                  var website =
+                    "<a href=" +
+                    '"' +
+                    formatUrl(feature.properties.Website) +
+                    '"' +
+                    ' target="_blank">' +
+                    name +
+                    "</a>";
+
+                  list_items =
+                    list_items +
+                    "<h3>" +
+                    website +
+                    "<br>" +
+                    cuisine +
+                    "<br>" +
+                    address +
+                    "<br>" +
+                    location +
+                    "<br>" +
+                    phone +
+                    "<br>" +
+                    "—" +
+                    "<br>" +
+                    hours +
+                    "<br>" +
+                    type +
+                    "<br>" +
+                    details +
+                    "</h3>";
+                  feature["text"] = "<ul>" + list_items + "</ul>";
+
+                  matchingFeatures.push(feature);
+                }
+              }
+
+              return matchingFeatures;
+              console.log("Matching: ", matchingFeatures);
+            }
+
+            //These are the geocoder settings from mapbox that can be customized//
+            //Set to search nearby the current window//
+            var geocoder = new MapboxGeocoder({
+              accessToken: mapboxgl.accessToken,
+              localGeocoder: forwardGeocoder,
+              zoom: 15,
+              limit: 10,
+              marker: false,
+              countries: "us",
+              placeholder: "Search by Restaurant or Cuisine",
+              mapboxgl: mapboxgl,
+              bbox: [-123.167215, 37.166554, -121.593255, 38.305876],
+
+              proximity: {
+                longitude: -122.349031,
+                latitude: 37.812426
+              }
+            });
+
+            document
+              .getElementById("geocoder")
+              .appendChild(geocoder.onAdd(map));
+            // Add the geocoder to the map
+
+            //Here we add a point for the result//
+            map.addSource("single-point", {
+              type: "geojson",
+              data: {
+                type: "FeatureCollection",
+                features: []
+              }
+            });
+
+            //It's a star//
+            map.addLayer({
+              id: "point",
+              source: "single-point",
+              type: "symbol",
+              layout: {
+                "icon-image": "circle-stroked-11"
+              }
+            });
+
+            geocoder.on("result", function(e) {
+              map.getSource("single-point").setData(e.result.geometry);
+            });
+
+            //This is the popup from the geocode//
+            geocoder.on("result", function(result) {
+              var filter = ["in", "Name"];
+
+              filter.push(result.result.id);
+
+              map.setFilter("highlight", filter);
+              console.log("filtered: ", filter);
+
+              //Customizes the mapbox geocoder response outputs//
+              //This makes it so only results from our database show in popup window //
+              var text = result.result.text;
+              var placeName = result.result.place_name;
+              if (placeName.includes("🍴")) {
+                createMobilePopup(text);
+              }
+              console.log("result", result.result);
+            });
+          }
+        );
+      }
+
+      var nav = new mapboxgl.NavigationControl({
+        showCompass: false
+      });
+      map.addControl(nav, "top-right");
+
+      function formatUrl(contactInfo) {
+        if (/^[a-z0-9]+:\/\//.test(contactInfo) != true) {
+          contactInfo = "https://" + contactInfo;
+        }
+        return contactInfo;
+      }
+
+      function detectmob() {
+        if (window.innerWidth <= 800 || window.innerHeight <= 700) {
+          return true;
+        } else {
+          return false;
+        }
+      }
+    </script>
+  </body>
+</html>
