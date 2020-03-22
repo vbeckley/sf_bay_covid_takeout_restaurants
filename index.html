@@ -312,7 +312,7 @@
               map.on("click", layerID, function(e) {
                 var list_items = "";
 
-                var bbox = [[e.point.x, e.point.y], [e.point.x, e.point.y]];
+                var bbox = [[e.point.x-10, e.point.y-10], [e.point.x+10, e.point.y+10]];
                 var features = map.queryRenderedFeatures(bbox, {
                   layers: ["Delivery & Takeout", "Delivery", "Takeout", "Other"]
                 });
