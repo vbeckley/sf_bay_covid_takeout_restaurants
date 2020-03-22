@@ -53,7 +53,7 @@
     <!-- Promise polyfill script required to use Mapbox GL Geocoder in IE 11 -->
     <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
-    <link rel="stylesheet" href="/sf_bay_covid_takeout_restaurants/style.css"/>
+    <link rel="stylesheet" href="/sf_bay_covid_takeout_restaurants/style.css" />
   </head>
 
   <body>
@@ -418,11 +418,7 @@
                   feature["id"] = feature.properties.Name;
                   feature["place_name"] =
                     "🍴 " +
-                    feature.properties.Name +
-                    " (" +
-                    feature.properties.Cuisine +
-                    ")" +
-                    ", " +
+                    feature.properties.Name + ", " +
                     feature.properties.City;
                   feature["center"] = feature.geometry.coordinates;
                   feature["place_type"] = feature.properties["Service_Method"];
@@ -448,6 +444,16 @@
                     '"' +
                     ' target="_blank">' +
                     name +
+                    "</a>";
+                  
+                    var phone =
+                    "<a href=" +
+                    '"' +
+                    "tel:+1" +
+                    feature.properties.Phone.replace(/[-()\s]/g, "") +
+                    '"' +
+                    ">" +
+                    feature.properties.Phone +
                     "</a>";
 
                   list_items =
